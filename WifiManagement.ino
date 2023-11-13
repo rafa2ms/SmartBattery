@@ -8,7 +8,7 @@ int last_measurement;
 
 // MQTT Broker
 const char *mqtt_broker = "broker.hivemq.com";
-const char *topic = "rafa2ms_esp32/voltage";
+const char *topic = "naturliches/voltage";
 //const char *mqtt_username = "emqx";
 //const char *mqtt_password = "public";
 const int mqtt_port = 1883;
@@ -56,6 +56,8 @@ void setup() {
       // =================================================================
       client.setServer(mqtt_broker, mqtt_port);
       client.setCallback(callback);
+      client.setKeepAlive(120); // Set to the desired keep-alive time in seconds
+      reconnect();
 
       while (!client.connected()) {
         String client_id = "esp32-client-rafa-";
@@ -70,11 +72,14 @@ void setup() {
           delay(2000);
         }
       }
+      
+      /*
       // Publish and subscribe
         client.publish(topic, "Hi, I'm ESP32 ^^");
         client.subscribe(topic);
       // =================================================================
       // =================================================================
+      */
   }
 }
 
@@ -89,6 +94,25 @@ void callback(char *topic, byte *payload, unsigned int length) {
     Serial.println("-----------------------");
 }
 
+void publishMessage(float n) {
+  String message = "Voltage: "; // Your message here
+  message.concat(String(n));
+  client.publish("/naturliches/mineralwasser", message.c_str()); // Publish the message
+}
+
+void reconnect() {
+  int attempt = 0;
+
+  while ((!client.connected()) && (attempt < 10)) {
+    if (client.connect("ArduinoClient")) {
+      client.subscribe(topic);
+      Serial.print("x ");
+    } else {
+      delay(2000);
+    }
+    attempt++;
+  }
+}
 
 void loop()
 {
@@ -103,13 +127,15 @@ void loop()
       Serial.print("\t");
       Serial.print(AN0_Voltage);
       Serial.println(" V");
-
-      // Convert the float to a string
+      publishMessage(AN0_Voltage);
+      
+      /* Convert the float to a string
       dtostrf(AN0_Voltage, 5, 2, buffer);  // 5 is the minimum width, 2 is the number of decimal places
-      client.publish(topic, buffer);
-      client.publish(topic,"voltage");
+      client.publish(topic, buffer);*/
 
       last_measurement = millis();
     }
+    client.loop();
+    delay(20);
   } 
 }
