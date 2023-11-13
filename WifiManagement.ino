@@ -2,10 +2,6 @@
 #include <PubSubClient.h>
 #include <WiFi.h>
 
-int AN0_Result = 0;
-float AN0_Voltage = 0;
-int last_measurement;
-
 // MQTT Broker
 const char *mqtt_broker = "broker.hivemq.com";
 const char *topic = "naturliches/voltage";
@@ -17,6 +13,7 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 
 void setup() {
+  pinMode(4, INPUT_PULLUP);
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
   // it is a good practice to make sure your code sets wifi mode how you want it.
@@ -52,7 +49,7 @@ void setup() {
       Serial.println(WiFi.status());
       //WiFi.getNetworkInfo(uint8_t networkItem, String &ssid, uint8_t &encryptionType, int32_t &RSSI, uint8_t *&BSSID, int32_t &channel);
       
-      // =================================================================
+
       // =================================================================
       client.setServer(mqtt_broker, mqtt_port);
       client.setCallback(callback);
@@ -72,14 +69,7 @@ void setup() {
           delay(2000);
         }
       }
-      
-      /*
-      // Publish and subscribe
-        client.publish(topic, "Hi, I'm ESP32 ^^");
-        client.subscribe(topic);
       // =================================================================
-      // =================================================================
-      */
   }
 }
 
@@ -116,11 +106,29 @@ void reconnect() {
 
 void loop()
 {
-  last_measurement = millis();
+  int AN0_Result = 0;
+  float AN0_Voltage = 0;
+  unsigned long int last_measurement;
+  unsigned long int last_click;
+  bool publishment = true;
   char buffer[10];  // Buffer to hold the converted string
+  bool buttonState, last_buttonState = false;
+  
+  last_measurement = millis();
+  last_click = millis();
 
   while (true){
-    if (millis() - last_measurement > 2000){
+    buttonState = digitalRead(4);
+    if (buttonState != last_buttonState){
+      if ((millis() - last_click) > 3000){ // check if period between last change is more than 100 ms (debouncing)
+        publishment = !publishment;
+        last_click = millis();
+      }
+      last_buttonState = buttonState;
+    }
+
+    if(publishment){
+      if (millis() - last_measurement > 2000){
       AN0_Result = analogRead(A0);
       AN0_Voltage = float(AN0_Result) / 1024.0;
       Serial.print(AN0_Result);
@@ -128,13 +136,11 @@ void loop()
       Serial.print(AN0_Voltage);
       Serial.println(" V");
       publishMessage(AN0_Voltage);
-      
-      /* Convert the float to a string
-      dtostrf(AN0_Voltage, 5, 2, buffer);  // 5 is the minimum width, 2 is the number of decimal places
-      client.publish(topic, buffer);*/
 
       last_measurement = millis();
+      }
     }
+
     client.loop();
     delay(20);
   } 
