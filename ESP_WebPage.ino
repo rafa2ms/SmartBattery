@@ -64,31 +64,6 @@ void setup() {
 
   // turn off led
   LED0 = false;
-  //digitalWrite(PIN_LED, LED0);
-
-  // if your web page or XML are large, you may not get a call back from the web page
-  // and the ESP will think something has locked up and reboot the ESP
-  // not sure I like this feature, actually I kinda hate it
-  // disable watch dog timer 0
-  //disableCore0WDT();
-
-  // maybe disable watch dog timer 1 if needed
-  //--disableCore1WDT();
-  /*
-  // _________________________________________________________________________
-  WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-  //WiFiManager, Local intialization. Once its business is done, there is no need to keep it around
-  WiFiManager wm;
-  bool res;
-  // res = wm.autoConnect(); // auto generated AP name from chipid
-  // res = wm.autoConnect("AutoConnectAP"); // anonymous ap
-
-  res = wm.autoConnect("AutoConnectAP","password"); // password protected ap //autoConnect
-  
-  if(!res) {
-    Serial.println("________ Failed to connect________");
-  // _________________________________________________________________________
-  */
     startAccessPoint();
   
     //--printWifiStatus();
@@ -105,20 +80,6 @@ void setup() {
 
     // finally begin the server
     server.begin();
-  
-  /*
-  // _________________________________________________________________________
-  } else {
-    //if you get here you have connected to the WiFi    
-    Serial.println("connected...yeey :)");
-    Serial.println(WiFi.localIP());
-    Serial.println(WiFi.status());
-    //WiFi.getNetworkInfo(uint8_t networkItem, String &ssid, uint8_t &encryptionType, int32_t &RSSI, uint8_t *&BSSID, int32_t &channel);
-    
-    brokerConnection();
-  }
-  // _________________________________________________________________________
-  */
 
 }
 
@@ -151,11 +112,8 @@ void loop()
       if (millis() - last_measurement > 2000){
       BitsA0 = analogRead(A0);
       VoltsA0 = float(BitsA0) / 1024.0;
-      Serial.print(BitsA0);
-      Serial.print("\t");
-      Serial.print(VoltsA0);
-      Serial.println(" V");
-      //publishMessage(VoltsA0);
+      Serial.printf("%.2f \t %.2f \n", BitsA0, VoltsA0);
+      publishMessage(VoltsA0);
 
       last_measurement = millis();
       }
@@ -206,8 +164,8 @@ void ProcessButton_0() {
   //
   LED0 = !LED0;
   //digitalWrite(PIN_LED, LED0);
-  Serial.print("Button 0 "); 
-  Serial.println(LED0);
+  Serial.printf("Button 0: %d", LED0); 
+  
   // regardless if you want to send stuff back to client or not
   // you must have the send line--as it keeps the page running
   // if you don't want feedback from the MCU--or let the XML manage
@@ -244,6 +202,8 @@ void SendAdvices() {
   Serial.println(server.arg("psw"));
   
   server.send_P(200, "text/html", PAGE_ADVICES);
+
+  delay(5000);
   accessPointMode = false;
 
   Serial.println(connectToWiFi(uname, psw));
@@ -254,7 +214,7 @@ void SendAdvices() {
 // PAGE_MAIN is a large char defined in SuperMon.h
 void SendWebsite() {
 
-  Serial.println("sending web page");
+  Serial.println("Sending web page");
   // you may have to play with this value, big pages need more porcessing time, and hence
   // a longer timeout that 200 ms
   server.send_P(200, "text/html", PAGE_MAIN);
@@ -266,24 +226,13 @@ void SendWebsite() {
 void SendXML() {
 
   // Serial.println("sending xml");
-
+ // replicating to send enough content as XML
   strcpy(XML, "<?xml version = '1.0'?>\n<Data>\n");
 
-  // send bitsA0
-  //sprintf(buf, "<B0>%d</B0>\n", BitsA0);
-  //strcat(XML, buf);
-  // send Volts0
   sprintf(buf, "<V0>%d.%d</V0>\n", (int) (VoltsA0), abs((int) (VoltsA0 * 10)  - ((int) (VoltsA0) * 10)));
   strcat(XML, buf);
-
-  // send bits1
-  //sprintf(buf, "<B1>%d</B1>\n", BitsA1);
-  //strcat(XML, buf);
-  // send Volts1
   sprintf(buf, "<V1>%d.%d</V1>\n", (int) (VoltsA1), abs((int) (VoltsA1 * 10)  - ((int) (VoltsA1) * 10)));
   strcat(XML, buf);
-
-  // replicating to send enough content as XML
   sprintf(buf, "<V2>%d.%d</V2>\n", (int) (VoltsA2), abs((int) (VoltsA2 * 10)  - ((int) (VoltsA2) * 10)));
   strcat(XML, buf);
   sprintf(buf, "<V3>%d.%d</V3>\n", (int) (VoltsA3), abs((int) (VoltsA3 * 10)  - ((int) (VoltsA3) * 10)));
@@ -313,65 +262,60 @@ void SendXML() {
   // you may have to play with this value, big pages need more porcessing time, and hence
   // a longer timeout that 200 ms
   server.send_P(200, "text/xml", XML);
-
-
 }
 
 // I think I got this code from the wifi example
 void printWifiStatus() {
 
   // print the SSID of the network you're attached to:
-  Serial.print("SSID: ");
-  Serial.println(WiFi.SSID());
+  Serial.printf("SSID: %s \n", WiFi.SSID());
 
   // print your WiFi shield's IP address:
   ip = WiFi.localIP();
-  Serial.print("IP Address: ");
-  Serial.println(ip);
+  Serial.printf("IP Address: %s \n", ip);
 
   // print the received signal strength:
   long rssi = WiFi.RSSI();
-  Serial.print("signal strength (RSSI):");
-  Serial.print(rssi);
-  Serial.println(" dBm");
+  Serial.printf("signal strength (RSSI): %ld dBm \n", rssi);
+
   // print where to go in a browser:
-  Serial.print("Open http://");
-  Serial.println(ip);
+  Serial.printf("Open http:// %s \n", ip);
 }
 
-// end of code
 
 void callback(char *topic, byte *payload, unsigned int length) {
-    Serial.print("Message arrived in topic: ");
-    Serial.println(topic);
+    Serial.printf("Message arrived in topic: %s \n", topic);
+    //Serial.println(topic);
     Serial.print("Message:");
     for (int i = 0; i < length; i++) {
         Serial.print((char) payload[i]);
     }
-    Serial.println();
-    Serial.println("-----------------------");
+    Serial.println("\n-----------------------");
 }
 
 void brokerConnection(){
   client.setServer(mqtt_broker, mqtt_port);
   client.setCallback(callback);
   client.setKeepAlive(120); // Set to the desired keep-alive time in seconds
-  reconnect();
+  //reconnect();
   int attempt = 0;
 
-  while (!client.connected() && (attempt < 10)) {
-    String client_id = "esp32-client-rafa-";
-    client_id += String(WiFi.macAddress());
-    Serial.printf("The client %s connects to the public MQTT broker\n", client_id.c_str());
+  String client_id = "esp32-client-rafa-";
+  client_id += String(WiFi.macAddress());
+  Serial.printf("The client %s connects to the public MQTT broker\n", client_id.c_str());
 
+  while (!client.connected() && (attempt < 10)) {
     if (client.connect(client_id.c_str())) {
       Serial.println("Public EMQX MQTT broker connected");
     } else {
       Serial.print("failed with state ");
-      Serial.print(client.state());
+      Serial.println(client.state());
       delay(1000);
     }
     attempt ++;
+  }
+  if (attempt == 10) {
+    Serial.println("failed");
   }
 }
 
@@ -387,7 +331,9 @@ void reconnect() {
     }
     attempt++;
   }
+  Serial.println("!");
 }
+
 void startAccessPoint(){
   Serial.println("________ Starting server ________");
   WiFi.softAP(AP_SSID, AP_PASS);
@@ -395,8 +341,7 @@ void startAccessPoint(){
   WiFi.softAPConfig(PageIP, gateway, subnet);
   delay(100);
   Actual_IP = WiFi.softAPIP();
-  Serial.print("IP address: "); 
-  Serial.println(Actual_IP);
+  Serial.printf("IP address: %s \n", Actual_IP); 
 }
 
 bool connectToWiFi(String uname, String psw) {
@@ -405,7 +350,6 @@ bool connectToWiFi(String uname, String psw) {
 
   const char* ssid = uname.c_str();
   const char* password = psw.c_str();
-
 
   Serial.println("Connecting to WiFi...");
   WiFi.begin(ssid, password);
