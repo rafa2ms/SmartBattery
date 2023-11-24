@@ -378,7 +378,7 @@ const char PAGE_MAIN[] PROGMEM = R"=====(
 			<div class="tabledata" id = "b1"></div><br>-->
 		</main>
 		
-		<form action="/advices" method="post" style="margin-left:30px;">
+		<form  action="/advices" method="post" style="margin-left:30px;"> <!-- a -->
 			<br>
 				<div class="category">Wi-fi Connection</div>
 			<br>
