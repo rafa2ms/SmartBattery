@@ -13,7 +13,7 @@
 #define AP_PASS "023456789"
 
 // start your defines for pins for sensors, outputs etc.
-#define PIN_LED 2     //On board LED
+//#define PIN_LED 2     //On board LED
 
 // MQTT Broker
 const char *mqtt_broker = "broker.hivemq.com";
@@ -23,8 +23,13 @@ const char *topic = "naturliches/voltage";
 const int mqtt_port = 1883;
 
 // variables to store measure data and sensor states
-int BitsA0 = 0, BitsA1 = 0;
+int BitsA0 = 0, BitsA1 = 0, BitsA2 = 0;
 float VoltsA0 = 0, VoltsA1 = 0, VoltsA2 = 0, VoltsA3 = 0;
+//analogReadResolution(12);  // Set resolution to 12 bits
+float batteryVoltage[5] = {0};
+const int analogPins[] = {A0, A1, 4};
+const float batteryVoltageRef = 1.5;  // Voltage of a single battery
+float referenceVoltage = 3.3;  // Initial reference voltage
 
 bool buttonState = false;
 bool LED0 = false;
@@ -56,14 +61,41 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 
 void setup() {
-  pinMode(4, INPUT_PULLUP);
+  pinMode(10, INPUT_PULLUP);
+  //pinMode(A0, INPUT);
   // standard stuff here
   Serial.begin(115200);
 
+  analogReadResolution(12);
   //*****pinMode(PIN_LED, OUTPUT);
 
   // turn off led
   LED0 = false;
+  //digitalWrite(PIN_LED, LED0);
+
+  // if your web page or XML are large, you may not get a call back from the web page
+  // and the ESP will think something has locked up and reboot the ESP
+  // not sure I like this feature, actually I kinda hate it
+  // disable watch dog timer 0
+  //disableCore0WDT();
+
+  // maybe disable watch dog timer 1 if needed
+  //--disableCore1WDT();
+  /*
+  // _________________________________________________________________________
+  WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+  //WiFiManager, Local intialization. Once its business is done, there is no need to keep it around
+  WiFiManager wm;
+  bool res;
+  // res = wm.autoConnect(); // auto generated AP name from chipid
+  // res = wm.autoConnect("AutoConnectAP"); // anonymous ap
+
+  res = wm.autoConnect("AutoConnectAP","password"); // password protected ap //autoConnect
+  
+  if(!res) {
+    Serial.println("________ Failed to connect________");
+  // _________________________________________________________________________
+  */
     startAccessPoint();
   
     //--printWifiStatus();
@@ -80,6 +112,20 @@ void setup() {
 
     // finally begin the server
     server.begin();
+  
+  /*
+  // _________________________________________________________________________
+  } else {
+    //if you get here you have connected to the WiFi    
+    Serial.println("connected...yeey :)");
+    Serial.println(WiFi.localIP());
+    Serial.println(WiFi.status());
+    //WiFi.getNetworkInfo(uint8_t networkItem, String &ssid, uint8_t &encryptionType, int32_t &RSSI, uint8_t *&BSSID, int32_t &channel);
+    
+    brokerConnection();
+  }
+  // _________________________________________________________________________
+  */
 
 }
 
@@ -95,8 +141,9 @@ void loop()
   last_measurement = millis();
   last_click = millis();
 
+
   while (true){
-    buttonState = digitalRead(4);
+    buttonState = digitalRead(19);
     if (buttonState != last_buttonState){
       if ((millis() - last_click) > 3000){ // check if period between last change is more than 100 ms (debouncing)
         publishment = !publishment;
@@ -110,12 +157,27 @@ void loop()
 
     if(publishment){
       if (millis() - last_measurement > 2000){
-      BitsA0 = analogRead(A0);
-      VoltsA0 = float(BitsA0) / 1024.0;
-      Serial.printf("%.2f \t %.2f \n", BitsA0, VoltsA0);
-      publishMessage(VoltsA0);
 
-      last_measurement = millis();
+        String voltageValues = "";
+        Serial.println("_____________________________________");
+
+        for (int i = 0; i < 3; i++) {
+          analogSetAttenuation(ADC_11db);  // Set attenuation for the current analog pin
+          batteryVoltage[i] = analogRead(analogPins[i]) * (referenceVoltage / 4095.0);
+
+          Serial.printf("\t Cell A%d: %.2f Volts \n", i+1 , batteryVoltage[i]);
+          voltageValues.concat(String(batteryVoltage[i])); //
+          voltageValues.concat(String(" / ")); // 
+
+          //referenceVoltage += batteryVoltage;  // Adjust reference for the next measurement
+          delay(100);
+        }
+        referenceVoltage = 3.3;
+        Serial.println("_____________________________________");
+    
+        publishMessage(voltageValues);
+
+        last_measurement = millis();
       }
     }
 
@@ -128,7 +190,6 @@ void loop()
           if (!connectToWiFi(uname, psw)){
             Serial.println("[Stopping WiFi mode]");
             accessPointMode = true;
-            //startAccessPoint();
             Serial.println("[Starting AccessPoint mode]");
           }
         }else{
@@ -150,9 +211,9 @@ void loop()
   } 
 }
 
-void publishMessage(float n) {
+void publishMessage(String str) {
   String message = "Voltage: "; // Your message here
-  message.concat(String(n));
+  message.concat(str);
   client.publish("/naturliches/mineralwasser", message.c_str()); // Publish the message
 }
 
@@ -229,15 +290,11 @@ void SendXML() {
  // replicating to send enough content as XML
   strcpy(XML, "<?xml version = '1.0'?>\n<Data>\n");
 
-  sprintf(buf, "<V0>%d.%d</V0>\n", (int) (VoltsA0), abs((int) (VoltsA0 * 10)  - ((int) (VoltsA0) * 10)));
-  strcat(XML, buf);
-  sprintf(buf, "<V1>%d.%d</V1>\n", (int) (VoltsA1), abs((int) (VoltsA1 * 10)  - ((int) (VoltsA1) * 10)));
-  strcat(XML, buf);
-  sprintf(buf, "<V2>%d.%d</V2>\n", (int) (VoltsA2), abs((int) (VoltsA2 * 10)  - ((int) (VoltsA2) * 10)));
-  strcat(XML, buf);
-  sprintf(buf, "<V3>%d.%d</V3>\n", (int) (VoltsA3), abs((int) (VoltsA3 * 10)  - ((int) (VoltsA3) * 10)));
-  strcat(XML, buf);
-
+  for (int k = 0; k < 4; k ++){
+    sprintf(buf, "<V%d>%.2f</V%d>\n", k, batteryVoltage[k], k);
+    strcat(XML, buf);
+  }
+ 
   // show led0 status
   if (LED0) {
     strcat(XML, "<LED>1</LED>\n");
@@ -262,6 +319,8 @@ void SendXML() {
   // you may have to play with this value, big pages need more porcessing time, and hence
   // a longer timeout that 200 ms
   server.send_P(200, "text/xml", XML);
+
+
 }
 
 // I think I got this code from the wifi example
@@ -350,6 +409,7 @@ bool connectToWiFi(String uname, String psw) {
 
   const char* ssid = uname.c_str();
   const char* password = psw.c_str();
+
 
   Serial.println("Connecting to WiFi...");
   WiFi.begin(ssid, password);
