@@ -3,17 +3,19 @@
 #include <WebServer.h>  // standard library
 #include "SuperMon.h"   // .h file that stores your html page code
 #include <PubSubClient.h>
+#include <EEPROM.h>
 
 // here you post web pages to your homes intranet which will make page debugging easier
 // as you just need to refresh the browser as opposed to reconnection to the web server
 #define USE_INTRANET
+//#define LEDPIN 8
 
 // once  you are read to go live these settings are what you client will connect to
 #define AP_SSID "TestWebSite"
 #define AP_PASS "023456789"
 
 // start your defines for pins for sensors, outputs etc.
-//#define PIN_LED 2     //On board LED
+#define PIN_LED 8     //On board LED
 
 // MQTT Broker
 const char *mqtt_broker = "broker.hivemq.com";
@@ -32,10 +34,12 @@ const float batteryVoltageRef = 1.5;  // Voltage of a single battery
 float referenceVoltage = 3.3;  // Initial reference voltage
 
 bool buttonState = false;
-bool LED0 = false;
+bool LedStatus = false;
 uint32_t SensorUpdate = 0;
 
 bool accessPointMode = true;
+
+const int MAX_LENGTH = 20;
 String uname;
 String psw;
 
@@ -60,6 +64,11 @@ WebServer server(80);
 WiFiClient espClient;
 PubSubClient client(espClient);
 
+struct {
+  String mySSID;
+  String myPW;
+} settings;
+
 void setup() {
   pinMode(10, INPUT_PULLUP);
   //pinMode(A0, INPUT);
@@ -67,51 +76,58 @@ void setup() {
   Serial.begin(115200);
 
   analogReadResolution(12);
-  //*****pinMode(PIN_LED, OUTPUT);
+  pinMode(PIN_LED, OUTPUT);
 
   // turn off led
-  LED0 = false;
-  //digitalWrite(PIN_LED, LED0);
+  LedStatus = false;
+  digitalWrite(PIN_LED, LedStatus);
 
-  // if your web page or XML are large, you may not get a call back from the web page
-  // and the ESP will think something has locked up and reboot the ESP
-  // not sure I like this feature, actually I kinda hate it
-  // disable watch dog timer 0
-  //disableCore0WDT();
-
-  // maybe disable watch dog timer 1 if needed
-  //--disableCore1WDT();
-  /*
   // _________________________________________________________________________
-  WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-  //WiFiManager, Local intialization. Once its business is done, there is no need to keep it around
-  WiFiManager wm;
-  bool res;
-  // res = wm.autoConnect(); // auto generated AP name from chipid
-  // res = wm.autoConnect("AutoConnectAP"); // anonymous ap
+  EEPROM.begin(sizeof(settings));
+  unsigned int addr = 0;
+  EEPROM.get(addr, settings);
 
-  res = wm.autoConnect("AutoConnectAP","password"); // password protected ap //autoConnect
-  
-  if(!res) {
-    Serial.println("________ Failed to connect________");
-  // _________________________________________________________________________
-  */
+  Serial.printf("SSID: %s \nPW: %s\n", settings.mySSID, settings.myPW);
+
+  String myString = settings.mySSID;
+
+  for (size_t i = 0; i < myString.length(); i++) {
+      char currentChar = myString[i];
+
+      if (static_cast<unsigned char>(currentChar) <= 127) {
+          // Character is ASCII
+          Serial.print("ASCII: ");
+          Serial.println(currentChar);
+      } else {
+          // Character is not ASCII
+          Serial.print("Not ASCII: ");
+          Serial.println(currentChar);
+      }
+  }
+
+  if (settings.mySSID[0] != '\0'){
+    accessPointMode = false;
+    Serial.println(connectToWiFi(settings.mySSID, settings.myPW));
+  }else{
     startAccessPoint();
+  }
   
-    //--printWifiStatus();
+  // _________________________________________________________________________
 
-    // these calls will handle data coming back from your web page
-    // this one is a page request, upon ESP getting / string the web page will be sent
-    server.on("/", SendWebsite);
+  //startAccessPoint();
 
-    // upon esp getting /XML string, ESP will build and send the XML, this is how we refresh
-    // just parts of the web page
-    server.on("/advices", SendAdvices);
-    server.on("/xml", SendXML);
-    server.on("/BUTTON_0", ProcessButton_0);
+  // these calls will handle data coming back from your web page
+  // this one is a page request, upon ESP getting / string the web page will be sent
+  server.on("/", SendWebsite);
 
-    // finally begin the server
-    server.begin();
+  // upon esp getting /XML string, ESP will build and send the XML, this is how we refresh
+  // just parts of the web page
+  server.on("/advices", SendAdvices);
+  server.on("/xml", SendXML);
+  server.on("/BUTTON_0", ProcessButton_0);
+
+  // finally begin the server
+  server.begin();
   
   /*
   // _________________________________________________________________________
@@ -143,7 +159,7 @@ void loop()
 
 
   while (true){
-    buttonState = digitalRead(19);
+    buttonState = digitalRead(10);
     if (buttonState != last_buttonState){
       if ((millis() - last_click) > 3000){ // check if period between last change is more than 100 ms (debouncing)
         publishment = !publishment;
@@ -223,9 +239,9 @@ void publishMessage(String str) {
 void ProcessButton_0() {
   
   //
-  LED0 = !LED0;
-  //digitalWrite(PIN_LED, LED0);
-  Serial.printf("Button 0: %d", LED0); 
+  LedStatus = !LedStatus;
+  digitalWrite(PIN_LED, LedStatus);
+  Serial.printf("Button 0: %d", LedStatus); 
   
   // regardless if you want to send stuff back to client or not
   // you must have the send line--as it keeps the page running
@@ -242,7 +258,7 @@ void ProcessButton_0() {
   // if you want to send feed back immediataly
   // note you must have reading code in the java script
   /*
-    if (LED0) {
+    if (LedStatus) {
     server.send(200, "text/plain", "1"); //Send web page
     }
     else {
@@ -261,7 +277,17 @@ void SendAdvices() {
 
   Serial.println(server.arg("uname"));
   Serial.println(server.arg("psw"));
-  
+
+  for(int i = 0; i < sizeof(settings); EEPROM.write(i++,'\0'));
+  EEPROM.commit();
+
+  settings.mySSID = uname;
+  settings.myPW = psw;
+
+  unsigned int addr = 0;
+  EEPROM.put(addr, settings);
+  EEPROM.commit();
+
   server.send_P(200, "text/html", PAGE_ADVICES);
 
   delay(5000);
@@ -295,8 +321,8 @@ void SendXML() {
     strcat(XML, buf);
   }
  
-  // show led0 status
-  if (LED0) {
+  // show LedStatus status
+  if (LedStatus) {
     strcat(XML, "<LED>1</LED>\n");
   }
   else {
@@ -400,7 +426,8 @@ void startAccessPoint(){
   WiFi.softAPConfig(PageIP, gateway, subnet);
   delay(100);
   Actual_IP = WiFi.softAPIP();
-  Serial.printf("IP address: %s \n", Actual_IP); 
+  Serial.print("IP address: "); 
+  Serial.println(Actual_IP);
 }
 
 bool connectToWiFi(String uname, String psw) {
@@ -420,6 +447,7 @@ bool connectToWiFi(String uname, String psw) {
     delay(3000);
     Serial.print(".");
   }
+  Serial.println(" !");
 
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println(F("WiFi connection FAILED"));
