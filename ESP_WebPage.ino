@@ -4,6 +4,7 @@
 #include "SuperMon.h"   // .h file that stores your html page code
 #include <PubSubClient.h>
 #include <EEPROM.h>
+#include <esp32-hal-timer.h>
 
 // here you post web pages to your homes intranet which will make page debugging easier
 // as you just need to refresh the browser as opposed to reconnection to the web server
@@ -16,6 +17,7 @@
 
 // start your defines for pins for sensors, outputs etc.
 #define PIN_LED 8     //On board LED
+#define PIN_BUTTON 10 
 
 // MQTT Broker
 const char *mqtt_broker = "broker.hivemq.com";
@@ -30,7 +32,7 @@ float VoltsA0 = 0, VoltsA1 = 0, VoltsA2 = 0, VoltsA3 = 0;
 //analogReadResolution(12);  // Set resolution to 12 bits
 float batteryVoltage[5] = {0};
 const int analogPins[] = {A0, A1, 4};
-const float batteryVoltageRef = 1.5;  // Voltage of a single battery
+float batteryVoltageRef = 1.5;  // Voltage of a single battery
 float referenceVoltage = 3.3;  // Initial reference voltage
 
 bool buttonState = false;
@@ -64,13 +66,58 @@ WebServer server(80);
 WiFiClient espClient;
 PubSubClient client(espClient);
 
+class MLS{
+public:
+  float A;
+  float B;
+
+  MLS (float a, float b): A(a), B(b) {}
+
+  void add_value(float a, float b) {
+      A = a;
+      B = b;
+  }
+} ;
+
+MLS MLS_ARRAY[3] = {
+  MLS(0.001760572, 	 0.008101050),
+  MLS(0.003619284,	-0.037782547),
+  MLS(0.00549846,	-0.016324718)
+}; 
+
 struct {
   String mySSID;
   String myPW;
 } settings;
 
+volatile int button_changed = 0;
+
+void isr() {
+	button_changed++;
+}
+/*
+const int timerInterval = 1000;  // Interval in milliseconds
+
+void IRAM_ATTR onTimer() {
+  // Code to execute when the timer interrupt occurs
+  //Serial.println("Timer interrupt!");
+  if(accessPointMode){
+    digitalWrite(PIN_LED, !digitalRead(PIN_LED));
+  }
+}*/
+
 void setup() {
-  pinMode(10, INPUT_PULLUP);
+  pinMode(PIN_BUTTON, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(PIN_BUTTON), isr, FALLING);
+  /*
+   // Set up timer interrupt
+   // 80 MHz / (1 / 500ms) = 80M Hz/2 Hz =   40 M
+  timerBegin(0, 40000, true);  // Timer 0, divider 80 (1 us ticks)
+  timerAttachInterrupt(0, &onTimer, true);
+  timerAlarmWrite(0, timerInterval * 1, true);
+  timerAlarmEnable(0);
+  */
+
   //pinMode(A0, INPUT);
   // standard stuff here
   Serial.begin(115200);
@@ -90,24 +137,24 @@ void setup() {
   Serial.printf("SSID: %s \nPW: %s\n", settings.mySSID, settings.myPW);
 
   String myString = settings.mySSID;
+  int c_ASCII = 0;
+  int i;
+  for (i = 0; i < myString.length(); i++) {
+    char currentChar = myString[i];
 
-  for (size_t i = 0; i < myString.length(); i++) {
-      char currentChar = myString[i];
-
-      if (static_cast<unsigned char>(currentChar) <= 127) {
-          // Character is ASCII
-          Serial.print("ASCII: ");
-          Serial.println(currentChar);
-      } else {
-          // Character is not ASCII
-          Serial.print("Not ASCII: ");
-          Serial.println(currentChar);
-      }
+    if (static_cast<unsigned char>(currentChar) <= 127) {
+      c_ASCII++;
+    } 
   }
+  Serial.printf("i: %d \n",i);
+  Serial.printf("c_ASCII: %d \n",c_ASCII);
 
-  if (settings.mySSID[0] != '\0'){
-    accessPointMode = false;
-    Serial.println(connectToWiFi(settings.mySSID, settings.myPW));
+  accessPointMode = true;
+
+  if ((settings.mySSID[0] != '\0')&&(c_ASCII == i)){
+    if(connectToWiFi(settings.mySSID, settings.myPW) ){
+      accessPointMode = false;
+    }
   }else{
     startAccessPoint();
   }
@@ -150,45 +197,58 @@ void loop()
   unsigned long int last_measurement;
   unsigned long int last_click;
   unsigned long int last_wificheck;
+  unsigned long int last_blink;
   bool publishment = true;
   char buffer[10];  // Buffer to hold the converted string
   bool last_buttonState = false;
   
   last_measurement = millis();
   last_click = millis();
-
+  float temp;
 
   while (true){
-    buttonState = digitalRead(10);
-    if (buttonState != last_buttonState){
+
+    //buttonState = digitalRead(PIN_BUTTON);
+    //if (buttonState != last_buttonState){
+    if(button_changed > 0){
       if ((millis() - last_click) > 3000){ // check if period between last change is more than 100 ms (debouncing)
-        publishment = !publishment;
+        //publishment = !publishment;
+
+        //Serial.println(connectToWiFi(uname, psw));
         //server.sendHeader("Location", "/main");
         //server.send(302, "text/plain", "");
+        startAccessPoint();
+        accessPointMode = true;
 
         last_click = millis();
+        button_changed = 0;
       }
-      last_buttonState = buttonState;
+      //last_buttonState = buttonState;
     }
 
     if(publishment){
       if (millis() - last_measurement > 2000){
 
+        batteryVoltageRef = 0;
         String voltageValues = "";
         Serial.println("_____________________________________");
+        analogSetAttenuation(ADC_11db);  // Set attenuation for the current analog pin
+        temp = 0;
+        referenceVoltage = 0;
 
         for (int i = 0; i < 3; i++) {
-          analogSetAttenuation(ADC_11db);  // Set attenuation for the current analog pin
-          batteryVoltage[i] = analogRead(analogPins[i]) * (referenceVoltage / 4095.0);
+          //batteryVoltage[i] = analogRead(analogPins[i]) * (referenceVoltage / 4095.0);
+          batteryVoltage[i] = (analogRead(analogPins[i]) * MLS_ARRAY[i].A) + MLS_ARRAY[i].B;
+          temp = batteryVoltage[i];
+          batteryVoltage[i] -= referenceVoltage;
+          referenceVoltage = temp;  // Adjust reference for the next measurement
 
-          Serial.printf("\t Cell A%d: %.2f Volts \n", i+1 , batteryVoltage[i]);
+          Serial.printf("\t Cell A%d: %.2f Volts\n", i+1 , batteryVoltage[i]);
           voltageValues.concat(String(batteryVoltage[i])); //
           voltageValues.concat(String(" / ")); // 
-
-          //referenceVoltage += batteryVoltage;  // Adjust reference for the next measurement
-          delay(100);
         }
-        referenceVoltage = 3.3;
+
+        //referenceVoltage = 3.3;
         Serial.println("_____________________________________");
     
         publishMessage(voltageValues);
@@ -219,6 +279,13 @@ void loop()
         }
       }
       last_wificheck = millis();
+    }
+    
+    if(accessPointMode){
+      if((millis() - last_blink) > 500){
+        digitalWrite(PIN_LED, !digitalRead(PIN_LED));
+        last_blink = millis();
+      }
     }
 
 	  server.handleClient();
@@ -437,14 +504,13 @@ bool connectToWiFi(String uname, String psw) {
   const char* ssid = uname.c_str();
   const char* password = psw.c_str();
 
-
   Serial.println("Connecting to WiFi...");
   WiFi.begin(ssid, password);
   int attempt = 0;
 
   while ((WiFi.status() != WL_CONNECTED) && (attempt < 10)) {
     attempt++;
-    delay(3000);
+    delay(500);
     Serial.print(".");
   }
   Serial.println(" !");
@@ -461,5 +527,7 @@ bool connectToWiFi(String uname, String psw) {
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
   Serial.println(F("Setup ready"));
+
+  digitalWrite(PIN_LED, HIGH);
   return true;
 }
