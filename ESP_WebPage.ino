@@ -31,7 +31,7 @@ int BitsA0 = 0, BitsA1 = 0, BitsA2 = 0;
 float VoltsA0 = 0, VoltsA1 = 0, VoltsA2 = 0, VoltsA3 = 0;
 //analogReadResolution(12);  // Set resolution to 12 bits
 float batteryVoltage[5] = {0};
-const int analogPins[] = {A0, A1, 4};
+const int analogPins[] = {A0, A1, 4, A2};
 float batteryVoltageRef = 1.5;  // Voltage of a single battery
 float referenceVoltage = 3.3;  // Initial reference voltage
 
@@ -79,10 +79,11 @@ public:
   }
 } ;
 
-MLS MLS_ARRAY[3] = {
+MLS MLS_ARRAY[4] = {
   MLS(0.001760572, 	 0.008101050),
   MLS(0.003619284,	-0.037782547),
-  MLS(0.00549846,	-0.016324718)
+  MLS(0.005498460,	-0.016324718),
+  MLS(0.007369870,	-0.041780630)
 }; 
 
 struct {
@@ -124,7 +125,8 @@ void setup() {
 
   analogReadResolution(12);
   pinMode(PIN_LED, OUTPUT);
-
+  pinMode(A2, INPUT);
+  
   // turn off led
   LedStatus = false;
   digitalWrite(PIN_LED, LedStatus);
@@ -236,14 +238,14 @@ void loop()
         temp = 0;
         referenceVoltage = 0;
 
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 4; i++) {
           //batteryVoltage[i] = analogRead(analogPins[i]) * (referenceVoltage / 4095.0);
           batteryVoltage[i] = (analogRead(analogPins[i]) * MLS_ARRAY[i].A) + MLS_ARRAY[i].B;
           temp = batteryVoltage[i];
           batteryVoltage[i] -= referenceVoltage;
           referenceVoltage = temp;  // Adjust reference for the next measurement
 
-          Serial.printf("\t Cell A%d: %.2f Volts\n", i+1 , batteryVoltage[i]);
+          Serial.printf("\t Cell A%d: %.2f Volts \t bytes: %d\n", i+1 , batteryVoltage[i],analogRead(analogPins[i]));
           voltageValues.concat(String(batteryVoltage[i])); //
           voltageValues.concat(String(" / ")); // 
         }
