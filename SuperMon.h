@@ -358,7 +358,7 @@ const char PAGE_MAIN[] PROGMEM = R"=====(
 			</div>
 		
 			
-			<div class="category">Sensor Controls </div>
+			<div class="category">Sensor Controls </div> 
 			<br>
 			<div class="bodytext">LED </div>
 			<button type="button" class = "btn" id = "btn0" onclick="ButtonPress0()">Toggle</button>
@@ -378,10 +378,20 @@ const char PAGE_MAIN[] PROGMEM = R"=====(
 			<div class="tabledata" id = "b1"></div><br>-->
 		</main>
 		
-		<form  action="/advices" method="post" style="margin-left:30px;"> <!-- a -->
-			<br>
-				<div class="category">Wi-fi Connection</div>
-			<br>
+        <br>
+            <div class="category">Wi-fi Connection</div>
+        <br>
+
+        <p id="dynamicText_Status">No stored Wi-Fi :(</p>
+        <p id="dynamicText_Uname"> </p>
+        
+        <button type="button" class = "btn" id = "btn_altwifi" onclick="ButtonPress_altwifi()">Reconect</button> <!--onclick=-->
+        <button type="button" class = "btn" id = "btn_neuwifi" onclick="ButtonPress_neuwifi()">New Wi-Fi</button>  <!--onclick="ButtonPress_neuwifi()-->
+        <br>
+        <br>
+
+		<form  action="/advices" method="post" style="margin-left:30px;" id = "myForm"> <!-- a -->
+
 			<div class="container">
 				<label for="uname"><b>Username</b></label>
 				<input type="text" placeholder="Enter Username" name="uname" required>
@@ -390,6 +400,7 @@ const char PAGE_MAIN[] PROGMEM = R"=====(
 				<input type="password" placeholder="Enter Password" name="psw" required>
 
 				<button type="submit">Login</button>
+
 				<label>
 				  <input type="checkbox" checked="checked" name="remember"> Remember me
 				</label>
@@ -463,6 +474,57 @@ const char PAGE_MAIN[] PROGMEM = R"=====(
       xhttp.open("PUT", "BUTTON_1", false);
       xhttp.send(); 
     }
+
+    function ButtonPress_altwifi() {
+        var xhttp = new XMLHttpRequest();
+
+        // Open and send the request
+        xhttp.open("PUT", "advices", true);
+        xhttp.send();
+
+        setTimeout(function() {
+          //your code to be executed after 1 second
+        }, 50);
+
+        window.location.href = '/advices';
+    }
+
+    //setVisibility("myForm", false);
+    function setVisibility(klass, visibility) {
+        var element = document.getElementById(klass);
+
+        // Toggle visibility
+        if (visibility) { //button.style.display === "none"
+            element.style.display = "block"; // or "inline" depending on your styling
+        } else {
+            element.style.display = "none";
+        }
+    }
+
+    function ButtonPress_neuwifi() {
+      //setVisibility("myForm", true);
+      
+      form = document.getElementById("myForm");
+      if (form.style.display == "none") {
+        setVisibility("myForm", true);
+      } else {
+        setVisibility("myForm", false);
+      }
+      
+
+      /*
+      var xhttp = new XMLHttpRequest(); 
+      
+      xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          document.getElementById("button1").innerHTML = this.responseText;
+        }
+      }
+      
+      xhttp.open("PUT", "BUTTON_1", false);
+      xhttp.send(); 
+      */
+    }
     
     function UpdateSlider(value) {
       var xhttp = new XMLHttpRequest();
@@ -487,6 +549,13 @@ const char PAGE_MAIN[] PROGMEM = R"=====(
       xhttp.send();
     }
 
+    
+
+    var ssid = "";
+    var pwd = "";
+    var connect = "No stored Wi-Fi :(";
+    setVisibility("btn_altwifi", false);
+
     // function to handle the response from the ESP
     function response(){
       var message;
@@ -503,43 +572,6 @@ const char PAGE_MAIN[] PROGMEM = R"=====(
       // get host date and time
       document.getElementById("time").innerHTML = dt.toLocaleTimeString();
       document.getElementById("date").innerHTML = dt.toLocaleDateString();
-
-	  /*
-      // A0
-      xmldoc = xmlResponse.getElementsByTagName("B0"); //bits for A0
-      message = xmldoc[0].firstChild.nodeValue;
-      
-      if (message > 2048){
-      color = "#aa0000";
-      }
-      else {
-        color = "#0000aa";
-      }
-      
-      barwidth = message / 40.95;
-      document.getElementById("b0").innerHTML=message;
-      document.getElementById("b0").style.width=(barwidth+"%");
-      // if you want to use global color set above in <style> section
-      // other wise uncomment and let the value dictate the color
-      //document.getElementById("b0").style.backgroundColor=color;
-      //document.getElementById("b0").style.borderRadius="5px";
-      
-	  
-      // A1
-      xmldoc = xmlResponse.getElementsByTagName("B1");
-      message = xmldoc[0].firstChild.nodeValue;
-      if (message > 2048){
-      color = "#aa0000";
-      }
-      else {
-        color = "#0000aa";
-      }
-      document.getElementById("b1").innerHTML=message;
-      //width = message / 40.95;
-      //document.getElementById("b1").style.width=(width+"%");
-      //document.getElementById("b1").style.backgroundColor=color;
-      //document.getElementById("b1").style.borderRadius="5px";
-	  */
 	  
 	  for (let i = 0; i < 4; i++){
 		xmldoc = xmlResponse.getElementsByTagName("V"+i); //volts for A0
@@ -580,6 +612,28 @@ const char PAGE_MAIN[] PROGMEM = R"=====(
         document.getElementById("btn1").innerHTML="Turn OFF";
         document.getElementById("switch").style.color="#00AA00";
       }
+
+      xmldoc = xmlResponse.getElementsByTagName("WIFIU");
+      message = xmldoc[0].firstChild.nodeValue;
+
+      if (message != ""){
+        connect = "Stored Wi-Fi: ";
+        ssid = message;
+        setVisibility("btn_altwifi",true);
+        //setVisibility("myForm", false);
+
+      }else{
+        ssid = "";
+        pwd = "";
+        connect = "No stored Wi-Fi :(";
+        setVisibility("btn_altwifi", false);        
+      }
+
+      xmldoc = xmlResponse.getElementsByTagName("WIFIP");
+      message = xmldoc[0].firstChild.nodeValue;
+
+      document.getElementById("dynamicText_Status").innerHTML= connect;
+      document.getElementById("dynamicText_Uname").innerHTML= ssid;
     }
   
     // general processing code for the web page to ask for an XML steam
@@ -675,8 +729,7 @@ const char PAGE_ADVICES[] = R"=====(
   </header>
 
   <main>
-  <br/>
-  <br/>
+  
   <br/>
     • Please, check if the green LED in the battery has stopped to blink.<br/><br/>
     • A steadly light indicates that the connection was successful.<br/><br/>
