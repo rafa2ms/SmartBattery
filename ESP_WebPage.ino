@@ -40,6 +40,7 @@ const int analogPins[] = {A0, A1, A4, A2};
 float batteryVoltage[QTD_CELLS] = {0};
 
 bool LedStatus = false;
+bool newUser = false;
 
 int myStates[] = {initi, WIFI_mode, AP_mode};
 String myStatesStr[] = {"initi", "WIFI_mode", "AP_mode"};
@@ -134,11 +135,11 @@ void loop(){
 		
 		last_measurement = millis();
 	}
-  	/*
-  	if (millis() - last_debuging > 9000){
+  /*
+  if (millis() - last_debuging > 9000){
 
 		Serial.printf("Current State: %d | %s \n", state, myStatesStr[state]);    
-    		Serial.printf("Connection Status\n" 
+    Serial.printf("Connection Status\n" 
                     "\t * AP: %d \n"
                     "\t * WiFi: %d \n"
                     "\t * Broker: %d \n"
@@ -146,8 +147,9 @@ void loop(){
     
 		last_debuging = millis();
 	}
-  	*/
-	delay(20);
+  */
+
+  delay(20);
 }
 
 void AccessPointRoutine(){
@@ -166,7 +168,7 @@ void WifiRoutine() {
 
 			last_click = millis();
 		}
-	}
+  }
 	
 	if (millis() - last_publishment > 2000){
 		if (!client.connected()){
@@ -183,9 +185,9 @@ void WifiRoutine() {
             
 			startAccessPoint();
 			state = AP_mode;
-    		}
+    }
 		last_wificheck = millis();
-  	}
+  }
 }
 
 void calculateVoltage(){
@@ -238,9 +240,7 @@ bool check_EEPROM(){
 			c_ASCII++;
 		} 
 	}
-	//Serial.printf("i: %d \n",i);
-	//Serial.printf("c_ASCII: %d \n",c_ASCII);
-
+  
 	return ((credential.SSID[0] != '\0')&&(c_ASCII == i));
 }
  
@@ -256,6 +256,7 @@ void startServer(){
 	server.on("/advices", SendAdvices);
 	server.on("/xml", SendXML);
 	server.on("/BUTTON_0", ProcessButton_0);
+  server.on("/BUTTON_altwifi", ProcessButton_altwifi);
 
 	// finally begin the server
 	server.begin();
@@ -272,31 +273,60 @@ void ProcessButton_0() {
 }
 
 void SendAdvices() {
-	Serial.println("sending advices");
-	// you may have to play with this value, big pages need more porcessing time, and hence
-	// a longer timeout that 200 ms
-	credential.SSID = (server.arg("uname"));
-	credential.PSW  = (server.arg("psw"));
 
-	Serial.printf("SSID: %s \nPSW: %s\n", credential.SSID, credential.PSW);
+  //if(newUser){
+  if (!SaveWifiEEPROM()){
+    Serial.println("Using Stored Credentials");
+  }
+  //}
+  if ((credential.SSID == "") || (credential.PSW == "") ){
+    Serial.println("Error: Null Element");
+    return;
+  }
 
-	for(int i = 0; i < sizeof(credential); EEPROM.write(i++,'\0'));
-	EEPROM.commit();
+  Serial.println("Credential OK");
+  server.send_P(200, "text/html", PAGE_ADVICES);
+  delay(3000);
 
-	unsigned int addr = 0;
-	EEPROM.put(addr, credential);
-	EEPROM.commit();
+  state = WIFI_mode;
+  if(!connectToWiFi(credential)){
+    startAccessPoint();
+    state = AP_mode;
+  }
+  newUser = true;
 
-	server.send_P(200, "text/html", PAGE_ADVICES);
-
-	delay(5000);
-
-	state = WIFI_mode;
-	if(!connectToWiFi(credential)){
-		startAccessPoint();
-		state = AP_mode;
-	}
 }
+
+bool SaveWifiEEPROM(){
+  // you may have to play with this value, big pages need more porcessing time, and hence
+  // a longer timeout that 200 ms
+  if ((server.arg("uname") == "") || (server.arg("psw") == "") ){
+    Serial.println("Error: Null Element");
+    return false;
+  }
+
+  credential.SSID = server.arg("uname");
+  credential.PSW  = server.arg("psw");
+
+  Serial.printf("SSID: %s \nPSW: %s\n", credential.SSID, credential.PSW);
+
+  for(int i = 0; i < sizeof(credential); EEPROM.write(i++,'\0'));
+  EEPROM.commit();
+
+  unsigned int addr = 0;
+  EEPROM.put(addr, credential);
+  EEPROM.commit();
+
+  return true;
+}
+
+
+void ProcessButton_altwifi(){
+  SendAdvices();
+  newUser = false;
+  //connectToWiFi(credential);
+}
+
 
 // code to send the main web page
 // PAGE_MAIN is a large char defined in SuperMon.h
@@ -305,7 +335,6 @@ void SendWebsite() {
 	// you may have to play with this value, big pages need more porcessing time, and hence
 	// a longer timeout that 200 ms
 	server.send_P(200, "text/html", PAGE_MAIN);
-
 }
 
 // I think I got this code from the wifi example
@@ -450,20 +479,17 @@ void SendXML() {
 		strcat(XML, buf);
 	}
 
-	// show LedStatus status
-	if (LedStatus) {
-		strcat(XML, "<LED>1</LED>\n");
-	}
-	else {
-		strcat(XML, "<LED>0</LED>\n");
-	}
+  sprintf(buf, "<LED>%d</LED>\n", LedStatus);
+  strcat(XML, buf);
 
-	if (digitalRead(PIN_BUTTON)) {
-		strcat(XML, "<SWITCH>1</SWITCH>\n");
-	}
-	else {
-		strcat(XML, "<SWITCH>0</SWITCH>\n");
-	}
+  sprintf(buf, "<SWITCH>%d</SWITCH>\n", digitalRead(PIN_BUTTON));
+  strcat(XML, buf);
+
+  sprintf(buf, "<WIFIU>%s</WIFIU>\n", credential.SSID);
+  strcat(XML, buf);
+
+  sprintf(buf, "<WIFIP>%s</WIFIP>\n", credential.PSW);
+  strcat(XML, buf);
 
 	strcat(XML, "</Data>\n");
 	// wanna see what the XML code looks like?
