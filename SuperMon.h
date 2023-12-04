@@ -72,10 +72,10 @@ const char PAGE_MAIN[] PROGMEM = R"=====(
 	  font-family: Arial;
 	}-->
     table {
-      <!-- position: relative; -->
+      /*position: relative; */
 	  position: relative;
       width: 100%;
-	  
+	  margin: 15px;
       border-spacing: 0px;
     }
     tr {
@@ -105,13 +105,13 @@ const char PAGE_MAIN[] PROGMEM = R"=====(
       transition: all 200ms ease-in-out;
       background-color: #00AA00;
     }
-	<!--
+	/*
     .fanrpmslider {
       width: 30%;
       height: 55px;
       outline: none;
       height: 25px;
-    }-->
+    }*/
     .bodytext {
       font-family: "Verdana", "Arial", sans-serif;
       font-size: 24px;
@@ -119,6 +119,7 @@ const char PAGE_MAIN[] PROGMEM = R"=====(
       font-weight: light;
       border-radius: 5px;
       display:inline;
+      padding: 20px 30px;
     }
     .navbar {
       width: 100%;
@@ -174,6 +175,18 @@ const char PAGE_MAIN[] PROGMEM = R"=====(
       padding: 20px 10px 0px 10px;
       color: #000000;
     }
+
+    .categoryblock {
+      font-family: "Verdana", "Arial", sans-serif;
+      /*
+      font-weight: bold;
+      font-size: 32px;
+      line-height: 50px;
+      */
+      padding: 15px 15px;
+      color: #000000;
+    }
+
     .heading {
       font-family: "Verdana", "Arial", sans-serif;
       font-weight: normal;
@@ -185,14 +198,19 @@ const char PAGE_MAIN[] PROGMEM = R"=====(
       background-color: #444444;
       border: none;
       color: white;
-      padding: 10px 20px;
+      padding: 1cqi 20px;
       text-align: center;
       text-decoration: none;
       display: inline-block;
       font-size: 16px;
-      margin: 4px 2px;
+      margin: 5px 5px 5px 25px ;
       cursor: pointer;
     }
+    /*
+    #btn1{
+        padding: 30px 30px;
+    }*/
+
     .foot {
       font-family: "Verdana", "Arial", sans-serif;
       font-size: 10px;
@@ -222,15 +240,15 @@ const char PAGE_MAIN[] PROGMEM = R"=====(
 	/* -------------- CSS to existing styles ---------------- */
 	form {
 	  max-width: 400px;
-	  <!-- margin: 0 auto; -->
-	  left-margin = 100px;
+	  /* margin: 0 auto; */
+	  margin: 30px 0px 0px 30px;
 	  font-family: Arial;
 	}
-	<!--
+	/*
 	.container {
 	  width: 100%;
 	}
-	-->
+	*/
 	
 	label {
 	  display: block;
@@ -273,6 +291,12 @@ const char PAGE_MAIN[] PROGMEM = R"=====(
 	  margin: 24px 0 12px 0;
 	}
 
+    div form label input[type="checkbox"] {
+        margin-top: 10px; /* Adjust the margin as needed */
+        margin-left: 10px; /* Adjust the margin as needed */
+        font-size: 16px; /* Adjust the font size as needed */
+    }
+
 	/* Responsive styles */
 	@media (max-width: 767px) {
 	  .tabledata,
@@ -302,115 +326,111 @@ const char PAGE_MAIN[] PROGMEM = R"=====(
 	
 	<!--<div class="center-container"> -->
 		<main class="container" style="margin-top:70px;" >
-			<div class="category">Sensor Readings</div>
+            <div class="categoryblock" id="firstblock">
+                <div class="category">Sensor Readings</div>
 			
-			<div style="border-radius: 10px !important;">
-				<table style="width:50%">
-					<colgroup>
-						<col span="1" style="background-color:rgb(230,230,230); width: 20%; color:#000000 ;">
-						<col span="1" style="background-color:rgb(200,200,200); width: 15%; color:#000000 ;">
-						<col span="1" style="background-color:rgb(180,180,180); width: 15%; color:#000000 ;">
-					</colgroup>
-					<col span="2"style="background-color:rgb(0,0,0); color:#FFFFFF">
-					<col span="2"style="background-color:rgb(0,0,0); color:#FFFFFF">
-					<col span="2"style="background-color:rgb(0,0,0); color:#FFFFFF">
-					<tr>
-						<th colspan="1"><div class="heading">Battery Cells</div></th>
-						<th colspan="1"><div class="heading">Volts</div></th>
-						<!--<th colspan="1"><div class="heading">Bits</div></th>-->
-					</tr>
-					<tr>
-						<td><div class="bodytext">Cell 1</div></td>
-						<td><div class="tabledata" id = "v0"></div></td>
-						<!--<td><div class="tabledata" id = "b3"></div></td>-->
-					</tr>
-					
-					<tr>
-						<td><div class="bodytext">Cell 2</div></td>
-						<td><div class="tabledata" id = "v1"></div></td>
-						<!--<td><div class="tabledata" id = "b1"></div></td>-->
-					</tr>
-					
-					<tr>
-						<td><div class="bodytext">Cell 3</div></td>
-						<td><div class="tabledata" id = "v2"></div></td>
-					</tr>
-					
-					<tr>
-						<td><div class="bodytext">Cell 4</div></td>
-						<td><div class="tabledata" id = "v3"></div></td>
-					</tr>
-					
-					
-					<!--
-					<tr>
-						<td><div class="bodytext">Digital switch</div></td>
-						<td><div class="tabledata" id = "switch"></div></td>
-					</tr>-->
-				</table>
-			</div>
-			<br>
+                <div style="border-radius: 10px !important;">
+                    <table style="width:50%">
+                        <colgroup>
+                            <col span="1" style="background-color:rgb(230,230,230); width: 20%; color:#000000 ;">
+                            <col span="1" style="background-color:rgb(200,200,200); width: 15%; color:#000000 ;">
+                            <col span="1" style="background-color:rgb(180,180,180); width: 15%; color:#000000 ;">
+                        </colgroup>
+                        <col span="2"style="background-color:rgb(0,0,0); color:#FFFFFF">
+                        <col span="2"style="background-color:rgb(0,0,0); color:#FFFFFF">
+                        <col span="2"style="background-color:rgb(0,0,0); color:#FFFFFF">
+                        <tr>
+                            <th colspan="1"><div class="heading">Battery Cells</div></th>
+                            <th colspan="1"><div class="heading">Volts</div></th>
+                            <!--<th colspan="1"><div class="heading">Bits</div></th>-->
+                        </tr>
+                        <tr>
+                            <td><div class="bodytext">Cell 1</div></td>
+                            <td><div class="tabledata" id = "v0"></div></td>
+                            <!--<td><div class="tabledata" id = "b3"></div></td>-->
+                        </tr>
+                        
+                        <tr>
+                            <td><div class="bodytext">Cell 2</div></td>
+                            <td><div class="tabledata" id = "v1"></div></td>
+                            <!--<td><div class="tabledata" id = "b1"></div></td>-->
+                        </tr>
+                        
+                        <tr>
+                            <td><div class="bodytext">Cell 3</div></td>
+                            <td><div class="tabledata" id = "v2"></div></td>
+                        </tr>
+                        
+                        <tr>
+                            <td><div class="bodytext">Cell 4</div></td>
+                            <td><div class="tabledata" id = "v3"></div></td>
+                        </tr>
+                        
+                    </table>
+                </div>
+                <br>
+                
+                <div class="bodytext">Digital switch
+                    <div class="btn" id = "switch"></div>
+                </div>
+                
+            </div>
 			
-			
-			
-			<div class="bodytext">Digital switch
-				<div class="btn" id = "switch"></div>
-			</div>
-		
-			
-			<div class="category">Sensor Controls </div> 
-			<br>
-			<div class="bodytext">LED </div>
-			<button type="button" class = "btn" id = "btn0" onclick="ButtonPress0()">Toggle</button>
-			</div>
-			<br>
-			<div class="bodytext">Switch</div>
-			<button type="button" class = "btn" id = "btn1" onclick="ButtonPress1()">Toggle</button>
-			</div>
-			<br>
-			<br>
-			<!-- This is a comment -->
-			<!--<div class="bodytext">Fan Speed Control (RPM: <span id="fanrpm"></span>)</div>-->
-			<br>
-			<!--<input type="range" class="fanrpmslider" min="0" max="255" value = "0" width = "0%" oninput="UpdateSlider(this.value)"/>-->
-			
-			<!--<div class="tabledata" id = "b0"></div><br>
-			<div class="tabledata" id = "b1"></div><br>-->
-		</main>
-		
-        <br>
-            <div class="category">Wi-fi Connection</div>
-        <br>
+            <div class="categoryblock" id="secondblock">
+                <div class="category">Sensor Controls </div> 
+                <br>
+                
+                
+                <button type="button" class = "btn" id = "btn0" onclick="ButtonPress0()">Toggle</button>
+                <div class="bodytext">LED </div>
 
-        <p id="dynamicText_Status">No stored Wi-Fi :(</p>
-        <p id="dynamicText_Uname"> </p>
+                <br>
+               
+                <button type="button" class = "btn" id = "btn1" onclick="ButtonPress1()">Toggle</button>
+                <div class="bodytext">Switch</div>
+                
+                <br>
+            </div>
+
+            <div class="categoryblock" id="thirdtblock" >
+                <div class="category">Wi-fi Connection</div>
+                <br>
+
+                <p class="bodytext" id="dynamicText_Status">No stored Wi-Fi :(</p>
+                <p class="bodytext" id="dynamicText_Uname"> </p>
+                
+                <button type="button" class = "btn" id = "btn_altwifi" onclick="ButtonPress_altwifi()">Reconect</button> <!--onclick=-->
+                <button type="button" class = "btn" id = "btn_neuwifi" onclick="ButtonPress_neuwifi()">New Wi-Fi</button>  <!--onclick="ButtonPress_neuwifi()-->
+                <br>
         
-        <button type="button" class = "btn" id = "btn_altwifi" onclick="ButtonPress_altwifi()">Reconect</button> <!--onclick=-->
-        <button type="button" class = "btn" id = "btn_neuwifi" onclick="ButtonPress_neuwifi()">New Wi-Fi</button>  <!--onclick="ButtonPress_neuwifi()-->
-        <br>
-        <br>
+                <div class="wificontainer"></div>
+                    <form  action="/advices" method="post" style="display: none" style.display = "block" id = "myForm"> <!-- margin-left:30px; -->
+            
+                        <label for="uname"><b>Username</b></label>
+                        <input type="text" placeholder="Enter Username" name="uname" required>
+        
+                        <label for="psw"><b>Password</b></label>
+                        <input type="password" placeholder="Enter Password" name="psw" required>
+        
+                        <button type="submit">Login</button>
 
-		<form  action="/advices" method="post" style="margin-left:30px;" id = "myForm"> <!-- a -->
+                        <button type="button" class="cancelbtn">Cancel</button>
+                        
+                        <br>
+                        <label>
+                            <input type="checkbox" checked="checked" name="remember" > Remember me
+                        </label>
 
-			<div class="container">
-				<label for="uname"><b>Username</b></label>
-				<input type="text" placeholder="Enter Username" name="uname" required>
+                     </form>
+                </div>
 
-				<label for="psw"><b>Password</b></label>
-				<input type="password" placeholder="Enter Password" name="psw" required>
-
-				<button type="submit">Login</button>
-
-				<label>
-				  <input type="checkbox" checked="checked" name="remember"> Remember me
-				</label>
-			</div>
-
-			<div class="container" style="background-color:#f1f1f1">
-				<button type="button" class="cancelbtn">Cancel</button>
-			</div>
-		</form>
-	<!-- </div> -->
+                    <!--
+                    <div class="container" style="background-color:#f1f1f1">
+                        <button type="button" class="cancelbtn">Cancel</button>
+                    </div> -->
+                
+            </div>
+		</main>
 
   <footer div class="foot" id = "temp" >ESP32 Web Page Creation and Data Update Demo</div></footer>
   
