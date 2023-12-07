@@ -83,6 +83,17 @@ void isr() {
 	button_pressed++;
 }
 
+//  ---------------------------------------------
+//                   Debuging
+//  ---------------------------------------------
+bool sequenceValidation = false;
+const char sequence[] = "#WIFI#"; 
+const int addr_seqn = 0;
+const int addr_cred = sizeof(sequence);
+const int addr_psw = addr_cred + MAX_CREDENTIAL_SIZE;
+const int EEPROM_SIZE = (2*MAX_CREDENTIAL_SIZE + sizeof(sequence))*sizeof(char);
+//  ---------------------------------------------
+
 /*
 const int timerInterval = 1000;  // Interval in milliseconds
 
@@ -106,10 +117,15 @@ void setup() {
 	digitalWrite(PIN_LED, LedStatus);
 
 	Serial.begin(115200);
+	EEPROM.begin(EEPROM_SIZE);
 
 	state = WIFI_mode;
 
-	if  ((check_EEPROM()) && (!connectToWiFi(credential))) {
+	bool cred = false;
+	if(check_EEPROM()){
+		cred = connectToWiFi(credential);
+	}
+	if (!cred) {
 		state = AP_mode;
 		startAccessPoint();
 	}
@@ -131,8 +147,8 @@ void loop(){
 	}
     
 	if (millis() - last_measurement > 5000){
-		calculateVoltage();
-		
+		//calculateVoltage();
+		Serial.println("(voltage values)");
 		last_measurement = millis();
 	}
   /*
@@ -157,6 +173,22 @@ void AccessPointRoutine(){
 		digitalWrite(PIN_LED, !digitalRead(PIN_LED));
 		last_blink = millis();
 	}
+
+  if(button_pressed > 0){
+		if ((millis() - last_click) > 1000){ // check if period between last change is more than 100 ms (debouncing)
+			button_pressed = 0;
+
+      int k = 0;
+      while (k < EEPROM_SIZE) {
+        EEPROM.write(k, '\0');
+        k++;
+      }
+      Serial.println("EEPROM Cleaned!");
+      EEPROM.commit();
+
+			last_click = millis();
+		}
+  }
 }
 
 void WifiRoutine() {
@@ -221,27 +253,50 @@ void publishVoltage() {
 	client.publish("/naturliches/mineralwasser", message.c_str()); // Publish the message
 }
 
+String substr(char *strin, int firstchar, int lastchar){
+  int len = lastchar - firstchar;
+  char *auxstr = new char[len + 1];
+
+  for(int k = 0; k < len; k++){
+    auxstr[k] = strin[firstchar + k];
+  }
+  auxstr[len] = '\0';
+
+  String myString(auxstr);
+  return myString;
+}
+
 bool check_EEPROM(){
-	unsigned int addr = 0;
 	int c_ASCII = 0;
-	int i;
+  sequenceValidation = false; // Change my mind
+  
+  char EEPROM_data[EEPROM_SIZE];
+  for(int j = 0; j < EEPROM_SIZE; j++){
+    EEPROM_data[j] = EEPROM.read(j + addr_seqn);
+  }
 
-	EEPROM.begin(sizeof(credential));
-	EEPROM.get(addr, credential);
+  String potentialSeq = substr(EEPROM_data, addr_seqn, sizeof(sequence)-1);
+  credential.SSID = substr(EEPROM_data, addr_cred, addr_cred + MAX_CREDENTIAL_SIZE);
+  credential.PSW  = substr(EEPROM_data, addr_psw,  addr_psw + MAX_CREDENTIAL_SIZE);
+ 
+  Serial.printf("[*][CEP] \nSSID: %s \nPSW: %s\n", credential.SSID, credential.PSW);
 
-	Serial.printf("SSID: %s \nPSW: %s\n", credential.SSID, credential.PSW);
-
+  const char *auxchar = potentialSeq.c_str();
+  if(memcmp(auxchar, sequence, sizeof(sequence))){
+    Serial.printf("Fail \n");
+    return false; 
+  }
+  
 	String myString = credential.SSID;
-
-	for (i = 0; i < myString.length(); i++) {
+	for (int i = 0; i < myString.length(); i++) {
 		char currentChar = myString[i];
-
-		if (static_cast<unsigned char>(currentChar) <= 127) {
-			c_ASCII++;
+		if (static_cast<unsigned char>(currentChar) > 127) {
+      return false; 
 		} 
 	}
-  
-	return ((credential.SSID[0] != '\0')&&(c_ASCII == i));
+
+  sequenceValidation = true;
+	return sequenceValidation;
 }
  
 void startServer(){
@@ -256,7 +311,7 @@ void startServer(){
 	server.on("/advices", SendAdvices);
 	server.on("/xml", SendXML);
 	server.on("/BUTTON_0", ProcessButton_0);
-  server.on("/BUTTON_altwifi", ProcessButton_altwifi);
+	server.on("/BUTTON_altwifi", ProcessButton_altwifi);
 
 	// finally begin the server
 	server.begin();
@@ -268,7 +323,7 @@ void ProcessButton_0() {
 	//
 	LedStatus = !LedStatus;
 	digitalWrite(PIN_LED, LedStatus);
-	Serial.printf("Button 0: %d", LedStatus); 
+	Serial.printf("Button_LED: %d\n", LedStatus); 
 	server.send(200, "text/plain", ""); //Send web page
 }
 
@@ -297,6 +352,12 @@ void SendAdvices() {
 
 }
 
+void strset(String str, char c = '\0', int size = MAX_CREDENTIAL_SIZE){
+  for(int k = 0; k < size; k++){
+    str[k] = c;
+  }
+}
+
 bool SaveWifiEEPROM(){
   // you may have to play with this value, big pages need more porcessing time, and hence
   // a longer timeout that 200 ms
@@ -308,18 +369,33 @@ bool SaveWifiEEPROM(){
   credential.SSID = server.arg("uname");
   credential.PSW  = server.arg("psw");
 
-  Serial.printf("SSID: %s \nPSW: %s\n", credential.SSID, credential.PSW);
+  for(int k = 0; k < EEPROM_SIZE; k++){
+    EEPROM.write(k, '\0');
+  }
 
-  for(int i = 0; i < sizeof(credential); EEPROM.write(i++,'\0'));
   EEPROM.commit();
-
-  unsigned int addr = 0;
-  EEPROM.put(addr, credential);
+  Serial.println("EEPROM Cleaned!");
+  delay(100);
+  //  ---------------------------------------------
+  for(int i = 0; i < sizeof(sequence); i++){
+    EEPROM.write(i + addr_seqn, sequence[i]);
+    //Serial.printf("\t%d |\t%d |\t%c \n", i, (i + addr_seqn), sequence[i]);
+  }
+  //  ---------------------------------------------
+  for(int i = 0; i < MAX_CREDENTIAL_SIZE; i++){
+    EEPROM.write(i + addr_cred, credential.SSID[i]);
+    EEPROM.write(i + addr_psw,  credential.PSW[i]);
+    //Serial.printf("\t%d |\t%d |\t%c \n", i, (i + addr_cred), credential.SSID[i]);
+  }
+  //  ---------------------------------------------
   EEPROM.commit();
-
+  Serial.println("Credential Stored into EEPROM");
+  delay(500);
+  Serial.printf("[*][SWE] \nSSID: %s \nPSW: %s\n", credential.SSID, credential.PSW);
+  
+  sequenceValidation = true;
   return true;
 }
-
 
 void ProcessButton_altwifi(){
   SendAdvices();
@@ -339,9 +415,9 @@ void SendWebsite() {
 
 // I think I got this code from the wifi example
 void printWifiStatus() {
-
+  Serial.println("________________");
 	// print the SSID of the network you're attached to:
-	Serial.printf("SSID: %s \n", WiFi.SSID());
+	Serial.printf("[403][PST] \nSSID: %s \n", WiFi.SSID());
 
 	// print your WiFi shield's IP address:
 	ip = WiFi.localIP();
@@ -434,6 +510,8 @@ bool connectToWiFi(wifidata credential) {
 
 	const char* ssid = uname.c_str();
 	const char* password = psw.c_str();
+  Serial.println("________________");
+  Serial.printf("[*][CTW] \nSSID: %s \nPSW: %s\n", ssid, password);
 
 	Serial.println("Connecting to WiFi...");
 	WiFi.begin(ssid, password);
@@ -485,17 +563,16 @@ void SendXML() {
   sprintf(buf, "<SWITCH>%d</SWITCH>\n", digitalRead(PIN_BUTTON));
   strcat(XML, buf);
 
+  /* Doesnt make sense send the password once it will be useless in the HTML code;
+  Instead, better send the bool flag associated with credential validation (ASCII and Parity) */
+  // sprintf(buf, "<WIFIP>%s</WIFIP>\n", credential.PSW);
+  sprintf(buf, "<VALID>%d</VALID>\n", int(sequenceValidation));
+  strcat(XML, buf);
+
   sprintf(buf, "<WIFIU>%s</WIFIU>\n", credential.SSID);
   strcat(XML, buf);
 
-  sprintf(buf, "<WIFIP>%s</WIFIP>\n", credential.PSW);
-  strcat(XML, buf);
-
 	strcat(XML, "</Data>\n");
-	// wanna see what the XML code looks like?
-	// actually print it to the serial monitor and use some text editor to get the size
-	// then pad and adjust char XML[2048]; above
-	//--Serial.println("XML Sent"); //XML
 
 	// you may have to play with this value, big pages need more porcessing time, and hence
 	// a longer timeout that 200 ms
