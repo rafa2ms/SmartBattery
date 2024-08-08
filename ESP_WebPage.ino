@@ -1,7 +1,7 @@
 #include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
 #include <WiFi.h>       // standard library
 #include <WebServer.h>  // standard library
-#include "SuperMon.h"   // .h file that stores your html page code
+#include "MyWebPage.h"   // .h file that stores your html page code
 #include <PubSubClient.h>
 #include <EEPROM.h>
 #include <esp32-hal-timer.h>
